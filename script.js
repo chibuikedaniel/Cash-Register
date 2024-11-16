@@ -52,50 +52,52 @@ function checkCashRegister() {
     // Calculate total cash in drawer
     const totalCid = cid.reduce((acc, curr) => acc + curr[1], 0);
     
-    // Check if total cash in drawer equals change due
-    if (totalCid === change) {
-        result.status = "CLOSED";
-        result.change = cid;
-    }
-    // Check if enough cash is available and calculate change
-    else {
-        const changeArray = [];
-        // Work from largest to smallest currency
-        for (let i = cid.length - 1; i >= 0; i--) {
-            const currency = cid[i][0];
-            const currencyTotal = cid[i][1];
-            const unitValue = currencyUnit[currency];
-            let currencyAmount = 0;
-            
-            // Calculate how many of current currency unit can be used
-            while (change >= unitValue && currencyTotal > currencyAmount) {
-                change -= unitValue;
-                currencyAmount += unitValue;
-                // Fix floating point precision
-                change = Math.round(change * 100) / 100;
-            }
-            
-            // Add to change array if any of this currency is used
-            if (currencyAmount > 0) {
-                changeArray.push([currency, currencyAmount]);
-            }
+    // Create a copy of cid for manipulation
+    let availableCid = cid.map(item => [...item]);
+    
+    // Calculate available change
+    let changeArray = [];
+    // Work from largest to smallest currency
+    for (let i = availableCid.length - 1; i >= 0; i--) {
+        const currency = availableCid[i][0];
+        const currencyTotal = availableCid[i][1];
+        const unitValue = currencyUnit[currency];
+        let currencyAmount = 0;
+        
+        // Calculate how many of current currency unit can be used
+        while (change >= unitValue && currencyTotal > currencyAmount) {
+            change -= unitValue;
+            currencyAmount += unitValue;
+            // Fix floating point precision
+            change = Math.round(change * 100) / 100;
         }
         
-        // Check if exact change could be made
-        if (change > 0) {
-            result.status = "INSUFFICIENT_FUNDS";
-            result.change = [];
-        } else {
-            result.status = "OPEN";
-            result.change = changeArray;
+        // Add to change array if any of this currency is used
+        if (currencyAmount > 0) {
+            changeArray.push([currency, currencyAmount]);
         }
+    }
+
+    // Check conditions and set appropriate status
+    if (change > 0) {
+        result.status = "INSUFFICIENT_FUNDS";
+        result.change = [];
+    } else if (Math.abs(totalCid - originalChange) < 0.01) {
+        result.status = "CLOSED";
+        // For CLOSED status, use all denominations in drawer
+        result.change = cid.filter(item => item[1] > 0);
+    } else {
+        result.status = "OPEN";
+        result.change = changeArray;
     }
     
     // Format and display the result
     let displayText = `Status: ${result.status}`;
     if (result.change.length > 0) {
         result.change.forEach(item => {
-            displayText += ` ${item[0]}: $${item[1].toFixed(2)}`;
+            if (item[1] > 0) {
+                displayText += ` ${item[0]}: $${item[1].toFixed(2)}`;
+            }
         });
     }
     changeDue.textContent = displayText;
